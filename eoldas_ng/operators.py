@@ -183,6 +183,14 @@ class Prior ( object ):
                     # Single parameter for all sites/locations etc
                     # This should really be in the __init__ method!
                     sigma = self.inv_cov[param]
+                # Max Chernetskiy change
+                # Do covariance matrix in the case if we have prior as a vector
+                # climatology for example...
+                # It's stupid but I don't want to change something in the code
+                else:
+                    sigma = self.inv_cov[param]
+                    self.inv_cov[param] = sp.dia_matrix ( ( np.ones(n_elems)*sigma, 0 ), shape=(n_elems, n_elems))
+                # End of Max change
                     
                     self.inv_cov[param] = sp.dia_matrix ( ( np.ones(n_elems)*sigma, 0 ), shape=(n_elems, n_elems))
 
@@ -646,7 +654,10 @@ class ObservationOperatorTimeSeriesGP ( object ):
         self.state = state
         self.observations = observations
         try:
-            self.n_bands, self.n_obs = self.observations.shape
+            # Max Chernetskiy Edit!!!
+            # Change (n_bands, n_obs) to (n_obs, n_bands)
+            # otherwise 'assertion error'
+            self.n_obs, self.n_bands = self.observations.shape
         except:
             raise ValueError, "Typically, obs should be (n_obs, n_bands)"
         self.mask = mask
@@ -756,6 +767,7 @@ class ObservationOperatorTimeSeriesGP ( object ):
         """Returns relevant information on the observations for a particular time step.
         """
         tag = np.round( self.mask[ this_loc, 2:].astype (np.int)/5.)*5
+
         tag = tuple ( (tag[:2].astype(np.int)).tolist() )
         this_obs = self.observations[ this_loc, :]
         return self.emulators[tag], this_obs, [ self.band_pass, self.bw ]
@@ -850,7 +862,8 @@ class ObservationOperatorTimeSeriesGP ( object ):
                 this_obsop, this_obs, this_extra = self.time_step ( \
                     this_obs_loc )
                 xs = x_params[:, itime]*1
-                dummy, df_0, dummy_fwd = self.calc_mismatch ( this_obsop, \
+                #!!!Max Edit: gradient was missed
+                dummy, df_0, dummy_fwd, gradient = self.calc_mismatch ( this_obsop, \
                     xs, this_obs, self.bu, *this_extra )
                 iloc = 0
                 iiloc = 0
@@ -859,7 +872,8 @@ class ObservationOperatorTimeSeriesGP ( object ):
                         continue                    
                     xxs = xs[i]*1
                     xs[i] += epsilon
-                    dummy, df_1, dummy_fwd = self.calc_mismatch ( this_obsop, \
+                    #!!!Max Edit: gradient was missed
+                    dummy, df_1, dummy_fwd, gradient = self.calc_mismatch ( this_obsop, \
                         xs, this_obs, self.bu, *this_extra )                    # Calculate d2f/d2x
                     hs =  (df_1 - df_0)/epsilon
                     if fin_diff == 2: # CONSTANT
